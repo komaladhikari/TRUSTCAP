@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const TARGET_RADIUS = 28;
-const MIN_POINTS = 25;
+const MIN_MOVES = 25;
 
 function distance(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
@@ -11,55 +11,60 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
-function makePoint(event, bounds) {
+function makeMouseEvent(event, bounds, type) {
   return {
+    type,
     x: Math.round(event.clientX - bounds.left),
     y: Math.round(event.clientY - bounds.top),
     t: Math.round(performance.now()),
   };
 }
 
-function buildFeatures(points) {
-  if (points.length < 2) {
+function buildFeatures(rawEvents) {
+  const moveEvents = rawEvents.filter((event) => event.type === "move");
+  const movementEvents = rawEvents.filter((event) => event.type !== "click");
+
+  if (rawEvents.length < 2 || movementEvents.length < 2) {
     return {
-      durationMs: 0,
-      pathLength: 0,
-      avgSpeed: 0,
-      maxSpeed: 0,
-      pauses: 0,
-      straightness: 0,
+      total_time: 0,
+      number_of_moves: moveEvents.length,
+      number_of_clicks: rawEvents.filter((event) => event.type === "click").length,
+      average_speed: 0,
+      max_speed: 0,
+      pause_count: 0,
+      path_length: 0,
     };
   }
 
-  let pathLength = 0;
-  let maxSpeed = 0;
-  let pauses = 0;
+  let path_length = 0;
+  let max_speed = 0;
+  let pause_count = 0;
 
-  for (let index = 1; index < points.length; index += 1) {
-    const current = points[index];
-    const previous = points[index - 1];
+  for (let index = 1; index < movementEvents.length; index += 1) {
+    const current = movementEvents[index];
+    const previous = movementEvents[index - 1];
     const segment = distance(current, previous);
     const deltaMs = Math.max(current.t - previous.t, 1);
     const speed = segment / deltaMs;
 
-    pathLength += segment;
-    maxSpeed = Math.max(maxSpeed, speed);
+    path_length += segment;
+    max_speed = Math.max(max_speed, speed);
 
     if (deltaMs > 120 && segment < 3) {
-      pauses += 1;
+      pause_count += 1;
     }
   }
 
-  const durationMs = points[points.length - 1].t - points[0].t;
-  const directDistance = distance(points[0], points[points.length - 1]);
+  const total_time = rawEvents[rawEvents.length - 1].t - rawEvents[0].t;
 
   return {
-    durationMs,
-    pathLength: Math.round(pathLength),
-    avgSpeed: Number((pathLength / Math.max(durationMs, 1)).toFixed(3)),
-    maxSpeed: Number(maxSpeed.toFixed(3)),
-    pauses,
-    straightness: Number((directDistance / Math.max(pathLength, 1)).toFixed(3)),
+    total_time,
+    number_of_moves: moveEvents.length,
+    number_of_clicks: rawEvents.filter((event) => event.type === "click").length,
+    average_speed: Number((path_length / Math.max(total_time, 1)).toFixed(3)),
+    max_speed: Number(max_speed.toFixed(3)),
+    pause_count,
+    path_length: Math.round(path_length),
   };
 }
 
@@ -78,16 +83,18 @@ function downloadJson(filename, data) {
 
 export default function MouseCaptcha() {
   const boardRef = useRef(null);
-  const [points, setPoints] = useState([]);
+  const rawEventsRef = useRef([]);
+  const [rawEvents, setRawEvents] = useState([]);
   const [isTracking, setIsTracking] = useState(false);
   const [status, setStatus] = useState("idle");
   const [target, setTarget] = useState({ x: 430, y: 170 });
   const [lastResult, setLastResult] = useState(null);
   const [boardSize, setBoardSize] = useState({ width: 640, height: 320 });
 
-  const features = useMemo(() => buildFeatures(points), [points]);
-  const trail = points.map((point) => `${point.x},${point.y}`).join(" ");
-  const latest = points[points.length - 1];
+  const features = useMemo(() => buildFeatures(rawEvents), [rawEvents]);
+  const movementEvents = rawEvents.filter((event) => event.type !== "click");
+  const trail = movementEvents.map((point) => `${point.x},${point.y}`).join(" ");
+  const latest = movementEvents[movementEvents.length - 1];
 
   useEffect(() => {
     const board = boardRef.current;
@@ -117,7 +124,8 @@ export default function MouseCaptcha() {
   }
 
   function resetTracker(nextStatus = "idle") {
-    setPoints([]);
+    rawEventsRef.current = [];
+    setRawEvents([]);
     setIsTracking(false);
     setStatus(nextStatus);
     setLastResult(null);
@@ -126,8 +134,10 @@ export default function MouseCaptcha() {
 
   function startTracking(event) {
     const bounds = event.currentTarget.getBoundingClientRect();
+    const clickEvent = makeMouseEvent(event, bounds, "click");
     event.currentTarget.setPointerCapture(event.pointerId);
-    setPoints([makePoint(event, bounds)]);
+    rawEventsRef.current = [clickEvent];
+    setRawEvents(rawEventsRef.current);
     setIsTracking(true);
     setStatus("tracking");
     setLastResult(null);
@@ -137,37 +147,38 @@ export default function MouseCaptcha() {
     if (!isTracking) return;
 
     const bounds = event.currentTarget.getBoundingClientRect();
-    const nextPoint = makePoint(event, bounds);
+    const nextEvent = makeMouseEvent(event, bounds, "move");
+    const previous = rawEventsRef.current[rawEventsRef.current.length - 1];
 
-    setPoints((currentPoints) => {
-      const previous = currentPoints[currentPoints.length - 1];
-      if (previous && previous.x === nextPoint.x && previous.y === nextPoint.y) {
-        return currentPoints;
-      }
+    if (previous && previous.x === nextEvent.x && previous.y === nextEvent.y) {
+      return;
+    }
 
-      return [...currentPoints, nextPoint];
-    });
+    rawEventsRef.current = [...rawEventsRef.current, nextEvent];
+    setRawEvents(rawEventsRef.current);
   }
 
   function stopTracking(event) {
     if (!isTracking) return;
 
     const bounds = event.currentTarget.getBoundingClientRect();
-    const endPoint = makePoint(event, bounds);
-    const nextPoints = [...points, endPoint];
-    const hitTarget = distance(endPoint, target) <= TARGET_RADIUS + 8;
-    const enoughData = nextPoints.length >= MIN_POINTS;
+    const releaseEvent = makeMouseEvent(event, bounds, "release");
+    const nextRawEvents = [...rawEventsRef.current, releaseEvent];
+    const nextFeatures = buildFeatures(nextRawEvents);
+    const hitTarget = distance(releaseEvent, target) <= TARGET_RADIUS + 8;
+    const enoughData = nextFeatures.number_of_moves >= MIN_MOVES;
     const result = hitTarget && enoughData ? "verified" : "retry";
 
-    setPoints(nextPoints);
+    rawEventsRef.current = nextRawEvents;
+    setRawEvents(nextRawEvents);
     setIsTracking(false);
     setStatus(result);
     setLastResult({
       label: result,
       hitTarget,
       enoughData,
-      points: nextPoints,
-      features: buildFeatures(nextPoints),
+      rawEvents: nextRawEvents,
+      features: nextFeatures,
       createdAt: new Date().toISOString(),
     });
   }
@@ -175,7 +186,7 @@ export default function MouseCaptcha() {
   function exportSample() {
     const sample = lastResult ?? {
       label: status,
-      points,
+      rawEvents,
       features,
       createdAt: new Date().toISOString(),
     };
@@ -236,7 +247,7 @@ export default function MouseCaptcha() {
           <button type="button" onClick={() => resetTracker("idle")}>
             Reset
           </button>
-          <button type="button" onClick={exportSample} disabled={points.length === 0}>
+          <button type="button" onClick={exportSample} disabled={rawEvents.length === 0}>
             Export JSON
           </button>
         </div>
@@ -247,31 +258,35 @@ export default function MouseCaptcha() {
         <dl>
           <div>
             <dt>Points</dt>
-            <dd>{points.length}</dd>
+            <dd>{rawEvents.length}</dd>
           </div>
           <div>
-            <dt>Duration</dt>
-            <dd>{features.durationMs} ms</dd>
+            <dt>total_time</dt>
+            <dd>{features.total_time} ms</dd>
           </div>
           <div>
-            <dt>Path length</dt>
-            <dd>{features.pathLength} px</dd>
+            <dt>number_of_moves</dt>
+            <dd>{features.number_of_moves}</dd>
           </div>
           <div>
-            <dt>Average speed</dt>
-            <dd>{features.avgSpeed} px/ms</dd>
+            <dt>number_of_clicks</dt>
+            <dd>{features.number_of_clicks}</dd>
           </div>
           <div>
-            <dt>Max speed</dt>
-            <dd>{features.maxSpeed} px/ms</dd>
+            <dt>average_speed</dt>
+            <dd>{features.average_speed} px/ms</dd>
           </div>
           <div>
-            <dt>Straightness</dt>
-            <dd>{features.straightness}</dd>
+            <dt>max_speed</dt>
+            <dd>{features.max_speed} px/ms</dd>
           </div>
           <div>
-            <dt>Pauses</dt>
-            <dd>{features.pauses}</dd>
+            <dt>pause_count</dt>
+            <dd>{features.pause_count}</dd>
+          </div>
+          <div>
+            <dt>path_length</dt>
+            <dd>{features.path_length} px</dd>
           </div>
         </dl>
       </aside>
