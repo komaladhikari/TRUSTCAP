@@ -18,13 +18,13 @@ FEATURES = [
 ]
 
 NORMAL_SAMPLE = {
-    "total_time": 2140,
-    "number_of_moves": 75,
+    "total_time": 762,
+    "number_of_moves": 31,
     "number_of_clicks": 1,
-    "average_speed": 0.326,
-    "max_speed": 1.02,
-    "pause_count": 4,
-    "path_length": 698,
+    "average_speed": 0.265,
+    "max_speed": 0.753,
+    "pause_count": 1,
+    "path_length": 202,
 }
 
 SHIFTED_SAMPLE = {
