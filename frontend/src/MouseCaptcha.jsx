@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 const TARGET_RADIUS = 28;
 const MIN_MOVES = 25;
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:4000";
 
 function distance(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
@@ -89,6 +90,7 @@ export default function MouseCaptcha() {
   const [status, setStatus] = useState("idle");
   const [target, setTarget] = useState({ x: 430, y: 170 });
   const [lastResult, setLastResult] = useState(null);
+  const [saveStatus, setSaveStatus] = useState("idle");
   const [boardSize, setBoardSize] = useState({ width: 640, height: 320 });
 
   const features = useMemo(() => buildFeatures(rawEvents), [rawEvents]);
@@ -129,6 +131,7 @@ export default function MouseCaptcha() {
     setIsTracking(false);
     setStatus(nextStatus);
     setLastResult(null);
+    setSaveStatus("idle");
     moveTarget();
   }
 
@@ -141,6 +144,7 @@ export default function MouseCaptcha() {
     setIsTracking(true);
     setStatus("tracking");
     setLastResult(null);
+    setSaveStatus("idle");
   }
 
   function trackMove(event) {
@@ -194,6 +198,40 @@ export default function MouseCaptcha() {
     downloadJson("trustcap-mouse-sample.json", sample);
   }
 
+  async function saveTrainingSample() {
+    if (!lastResult || lastResult.label !== "verified") return;
+
+    setSaveStatus("saving");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/samples`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          label: "normal",
+          features: lastResult.features,
+          metadata: {
+            hitTarget: lastResult.hitTarget,
+            enoughData: lastResult.enoughData,
+            createdAt: lastResult.createdAt,
+          },
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || "Could not save sample");
+      }
+
+      setSaveStatus("saved");
+    } catch (error) {
+      setSaveStatus("error");
+      console.error(error);
+    }
+  }
+
   return (
     <section className="tracker-layout">
       <div className="tracker-panel">
@@ -244,13 +282,37 @@ export default function MouseCaptcha() {
         </div>
 
         <div className="tracker-actions">
-          <button type="button" onClick={() => resetTracker("idle")}>
+          <button className="secondary-button" type="button" onClick={() => resetTracker("idle")}>
             Reset
           </button>
-          <button type="button" onClick={exportSample} disabled={rawEvents.length === 0}>
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={exportSample}
+            disabled={rawEvents.length === 0}
+          >
             Export JSON
           </button>
+          <button
+            className="primary-button"
+            type="button"
+            onClick={saveTrainingSample}
+            disabled={
+              !lastResult || lastResult.label !== "verified" || saveStatus === "saving"
+            }
+          >
+            {saveStatus === "saving" ? "Saving..." : "Save as normal"}
+          </button>
         </div>
+        {saveStatus !== "idle" && (
+          <p className={`save-message ${saveStatus}`}>
+            {saveStatus === "saved"
+              ? "Saved to normal.csv for future model training."
+              : saveStatus === "error"
+                ? "Backend save failed. Make sure the backend server is running."
+                : "Sending features to backend..."}
+          </p>
+        )}
       </div>
 
       <aside className="metrics-panel">

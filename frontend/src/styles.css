@@ -24,12 +24,12 @@ button {
   padding: 0 18px;
 }
 
-button:first-child {
+.secondary-button {
   background: #e7edf5;
   color: #1d2937;
 }
 
-button:last-child {
+.primary-button {
   background: #176b87;
   color: white;
 }
@@ -212,10 +212,31 @@ h2 {
 }
 
 .tracker-actions {
+  align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
   margin-top: 14px;
+}
+
+.save-message {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-top: 10px;
+  text-align: right;
+}
+
+.save-message.saving {
+  color: #735c00;
+}
+
+.save-message.saved {
+  color: #157347;
+}
+
+.save-message.error {
+  color: #ad3131;
 }
 
 .metrics-panel {
@@ -268,5 +289,17 @@ h2 {
 
   .tracker-board {
     height: 380px;
+  }
+
+  .tracker-actions {
+    justify-content: stretch;
+  }
+
+  .tracker-actions button {
+    flex: 1 1 150px;
+  }
+
+  .save-message {
+    text-align: left;
   }
 }
