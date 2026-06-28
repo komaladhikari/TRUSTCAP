@@ -91,6 +91,10 @@ h2 {
   max-width: 1180px;
 }
 
+.bot-layout {
+  margin-top: 18px;
+}
+
 .tracker-panel,
 .metrics-panel {
   background: #ffffff;
@@ -144,6 +148,16 @@ h2 {
   color: #ad3131;
 }
 
+.status-pill.running {
+  background: #fff3c4;
+  color: #735c00;
+}
+
+.status-pill.complete {
+  background: #fde4e4;
+  color: #ad3131;
+}
+
 .tracker-board {
   background:
     linear-gradient(rgba(23, 107, 135, 0.08) 1px, transparent 1px),
@@ -160,6 +174,15 @@ h2 {
   user-select: none;
 }
 
+.bot-board {
+  background:
+    linear-gradient(rgba(173, 49, 49, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(173, 49, 49, 0.08) 1px, transparent 1px),
+    #fffafa;
+  height: 260px;
+  min-height: 240px;
+}
+
 .trail-layer {
   height: 100%;
   inset: 0;
@@ -174,6 +197,10 @@ h2 {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 4;
+}
+
+.bot-trail {
+  stroke: #ad3131;
 }
 
 .target,
@@ -196,6 +223,11 @@ h2 {
   box-shadow: 0 0 0 5px rgba(23, 32, 42, 0.14);
   height: 10px;
   width: 10px;
+}
+
+.bot-cursor {
+  background: #ad3131;
+  box-shadow: 0 0 0 5px rgba(173, 49, 49, 0.16);
 }
 
 .board-hint {
@@ -237,6 +269,32 @@ h2 {
 
 .save-message.error {
   color: #ad3131;
+}
+
+.sample-code-block {
+  background: #17202a;
+  border-radius: 8px;
+  color: #f7fafc;
+  margin-top: 14px;
+  overflow: hidden;
+}
+
+.sample-code-block h3 {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.84rem;
+  letter-spacing: 0;
+  margin: 0;
+  padding: 10px 12px;
+  text-transform: uppercase;
+}
+
+.sample-code-block pre {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  margin: 0;
+  overflow-x: auto;
+  padding: 12px;
 }
 
 .metrics-panel {
